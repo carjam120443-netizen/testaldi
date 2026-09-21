@@ -25,7 +25,7 @@ jobs:
       - name: Download BepInEx
         shell: pwsh
         run: |
-          $url = "https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.5/BepInEx_win_x64_5.4.23.5_x64.zip"
+          $url = "https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.5/BepInEx_win_x64_5.4.23.5.zip"
           Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\bepinex.zip"
           Expand-Archive "$env:RUNNER_TEMP\bepinex.zip" -DestinationPath "$env:RUNNER_TEMP\bepinex"
           $dll = Get-ChildItem "$env:RUNNER_TEMP\bepinex" -Recurse -Filter "BepInEx.dll" | Select-Object -First 1
