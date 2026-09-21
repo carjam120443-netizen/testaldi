@@ -1,0 +1,53 @@
+name: Build Testaldi
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Download BepInEx
+        shell: pwsh
+        run: |
+          $url = "https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.5/BepInEx_win_x64_5.4.23.5_x64.zip"
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\bepinex.zip"
+          Expand-Archive "$env:RUNNER_TEMP\bepinex.zip" -DestinationPath "$env:RUNNER_TEMP\bepinex"
+          $dll = Get-ChildItem "$env:RUNNER_TEMP\bepinex" -Recurse -Filter "BepInEx.dll" | Select-Object -First 1
+          if (-not $dll) { throw "BepInEx.dll was not found in the downloaded package." }
+          New-Item -ItemType Directory -Force -Path "Dependencies" | Out-Null
+          Copy-Item $dll.FullName "Dependencies\BepInEx.dll"
+
+      - name: Restore
+        run: dotnet restore src/Testaldi/Testaldi.csproj
+
+      - name: Build
+        run: dotnet build src/Testaldi/Testaldi.csproj --configuration Release --no-restore
+
+      - name: Package mod
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "dist\Testaldi" | Out-Null
+          Copy-Item "src\Testaldi\bin\Release\netstandard2.0\Testaldi.dll" "dist\Testaldi\"
+          Compress-Archive -Path "dist\Testaldi\*" -DestinationPath "Testaldi.zip" -Force
+
+      - name: Upload mod artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Testaldi
+          path: Testaldi.zip
