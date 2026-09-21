@@ -1,5 +1,11 @@
 # Testaldi
 
+<p align="center">
+  <img src="https://images.squarespace-cdn.com/content/v1/6491eb91bb711304dd556188/164ff7ec-1c2f-43dc-aa32-5e852fe8801a/Baldis%2BBasics%2BPlus%2Blogo" alt="Baldi's Basics Plus logo" width="700">
+</p>
+
+<p align="center"><i>Baldi's Basics Plus logo © Basically Games, LLC. Image hosted by the official Baldi's Basics Plus website.</i></p>
+
 A Baldi's Basics Plus mod project for experimenting with custom content and gameplay ideas.
 
 ## Target
