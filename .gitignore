@@ -1,0 +1,13 @@
+bin/
+obj/
+Build/
+Release/
+.vs/
+*.user
+*.suo
+Library/
+Temp/
+Logs/
+UserSettings/
+.DS_Store
+Thumbs.db
