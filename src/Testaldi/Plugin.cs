@@ -24,7 +24,10 @@ public sealed class Plugin : BaseUnityPlugin
         Log.LogInfo($"{PluginName} {PluginVersion} loaded.");
 
         if (Chainloader.PluginInfos.TryGetValue("mtm101.rulerp.bbplus.baldidevapi", out var api))
+        {
             Log.LogInfo($"Baldi's Basics Plus Dev API detected: {api.Metadata.Version}");
+            CustomMapItem.Initialize(api.Metadata);
+        }
         else
             Log.LogError("Baldi's Basics Plus Dev API was not detected.");
     }
@@ -39,33 +42,41 @@ public sealed class Plugin : BaseUnityPlugin
 internal static class CustomMapItem
 {
     private const string SourceName = "Itm_Map";
-    private const string CustomName = "Itm_TestaldiMap";
+    private const string CustomName = "TestaldiMap";
+
+    private static object? customMap;
+    private static object? apiMetadata;
+
+    internal static void Initialize(object metadata)
+    {
+        apiMetadata = metadata;
+    }
 
     internal static void TryGive()
     {
         try
         {
             var itemObjectType = FindType("ItemObject");
+            var itemType = FindType("Item");
+            var itemBuilderType = FindType("MTM101BaldAPI.ObjectCreation.ItemBuilder");
+
+            if (itemObjectType == null || itemType == null || itemBuilderType == null || apiMetadata == null)
+            {
+                Plugin.Log.LogError("Testaldi Map: Dev API ItemBuilder or required BB+ types were not found.");
+                return;
+            }
+
+            customMap ??= BuildCustomMap(itemObjectType, itemType, itemBuilderType);
+
+            if (customMap == null)
+                return;
+
             var coreGameManagerType = FindType("CoreGameManager");
-
-            if (itemObjectType == null || coreGameManagerType == null)
+            if (coreGameManagerType == null)
             {
-                Plugin.Log.LogError("Testaldi Map: required BB+ types were not found.");
+                Plugin.Log.LogError("Testaldi Map: CoreGameManager type was not found.");
                 return;
             }
-
-            var map = FindMap(itemObjectType);
-            if (map == null)
-            {
-                Plugin.Log.LogError("Testaldi Map: could not find the built-in Map item.");
-                return;
-            }
-
-            var customMap = (UnityEngine.Object)UnityEngine.Object.Instantiate((UnityEngine.Object)map);
-            customMap.name = CustomName;
-
-            // Keep the original Map nameKey. BB+ uses the built-in item metadata
-            // when handling the Map's special use behavior; changing it breaks that path.
 
             var core = GetSingletonInstance(coreGameManagerType);
             if (core == null)
@@ -118,12 +129,82 @@ internal static class CustomMapItem
             }
 
             addItem.Invoke(inventory, new[] { customMap });
-            Plugin.Log.LogInfo("F2 pressed — gave the player the custom Testaldi Map.");
+            Plugin.Log.LogInfo("F2 pressed — gave the registered Testaldi Map.");
         }
         catch (Exception ex)
         {
             Plugin.Log.LogError($"Testaldi Map failed: {ex.GetType().Name}: {ex.Message}");
         }
+    }
+
+    private static object? BuildCustomMap(Type itemObjectType, Type itemType, Type itemBuilderType)
+    {
+        var map = FindMap(itemObjectType);
+        if (map == null)
+        {
+            Plugin.Log.LogError("Testaldi Map: could not find the built-in Map item.");
+            return null;
+        }
+
+        var itemField = itemObjectType.GetField(
+            "item",
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+        var mapItem = itemField?.GetValue(map);
+
+        if (mapItem == null || !itemType.IsInstanceOfType(mapItem))
+        {
+            Plugin.Log.LogError("Testaldi Map: built-in Map item component was not available.");
+            return null;
+        }
+
+        var constructor = itemBuilderType.GetConstructor(new[] { apiMetadata!.GetType() });
+        if (constructor == null)
+        {
+            Plugin.Log.LogError("Testaldi Map: could not construct the Dev API ItemBuilder.");
+            return null;
+        }
+
+        var builder = constructor.Invoke(new[] { apiMetadata });
+
+        var setEnum = itemBuilderType.GetMethod("SetEnum", new[] { typeof(string) });
+        var setName = itemBuilderType.GetMethod(
+            "SetNameAndDescription",
+            new[] { typeof(string), typeof(string) });
+
+        var setComponent = itemBuilderType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(m =>
+            {
+                if (m.Name != "SetItemComponent")
+                    return false;
+
+                var parameters = m.GetParameters();
+                return parameters.Length == 1 &&
+                       parameters[0].ParameterType.IsAssignableFrom(itemType);
+            });
+
+        var build = itemBuilderType.GetMethod("Build", Type.EmptyTypes);
+
+        if (setEnum == null || setName == null || setComponent == null || build == null)
+        {
+            Plugin.Log.LogError("Testaldi Map: required Dev API ItemBuilder methods were not found.");
+            return null;
+        }
+
+        setEnum.Invoke(builder, new object[] { CustomName });
+        setName.Invoke(builder, new object[] { "Testaldi Map", "A Testaldi map item." });
+        setComponent.Invoke(builder, new[] { mapItem });
+
+        var built = build.Invoke(builder, null);
+
+        if (built == null)
+        {
+            Plugin.Log.LogError("Testaldi Map: Dev API ItemBuilder returned no ItemObject.");
+            return null;
+        }
+
+        Plugin.Log.LogInfo("Testaldi Map: registered custom Items enum and built ItemObject through Dev API.");
+        return built;
     }
 
     private static object? GetSingletonInstance(Type targetType)
