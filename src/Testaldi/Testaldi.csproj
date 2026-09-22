@@ -12,5 +12,9 @@
       <HintPath>../../Dependencies/BepInEx.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>../../Dependencies/UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 </Project>
