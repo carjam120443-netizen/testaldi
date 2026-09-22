@@ -1,1 +1,182 @@
-using BepInEx;\nusing BepInEx.Bootstrap;\nusing BepInEx.Logging;\nusing System;\nusing System.Linq;\nusing System.Reflection;\nusing UnityEngine;\n\nnamespace Testaldi;\n\n[BepInPlugin(PluginGuid, PluginName, PluginVersion)]\n[BepInDependency("mtm101.rulerp.bbplus.baldidevapi", "11.1.0.2")]\npublic sealed class Plugin : BaseUnityPlugin\n{\n    public const string PluginGuid = "carjam120443.testaldi";\n    public const string PluginName = "Testaldi";\n    public const string PluginVersion = "0.1.0";\n\n    internal static ManualLogSource Log { get; private set; } = null!;\n\n    private void Awake()\n    {\n        Log = Logger;\n        Log.LogInfo($"{PluginName} {PluginVersion} loaded.");\n\n        if (Chainloader.PluginInfos.TryGetValue("mtm101.rulerp.bbplus.baldidevapi", out var api))\n            Log.LogInfo($"Baldi's Basics Plus Dev API detected: {api.Metadata.Version}");\n        else\n            Log.LogError("Baldi's Basics Plus Dev API was not detected.");\n    }\n\n    private void Update()\n    {\n        if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.F2))\n            CustomMapItem.TryGive();\n    }\n}\n\ninternal static class CustomMapItem\n{\n    private const string SourceName = "Itm_Map";\n    private const string CustomName = "Itm_TestaldiMap";\n\n    internal static void TryGive()\n    {\n        try\n        {\n            var itemObjectType = FindType("ItemObject");\n            var coreGameManagerType = FindType("CoreGameManager");\n\n            if (itemObjectType == null || coreGameManagerType == null)\n            {\n                Plugin.Log.LogError("Testaldi Map: required BB+ types were not found.");\n                return;\n            }\n\n            var map = FindMap(itemObjectType);\n            if (map == null)\n            {\n                Plugin.Log.LogError("Testaldi Map: could not find the built-in Map item.");\n                return;\n            }\n\n            var customMap = (UnityEngine.Object)UnityEngine.Object.Instantiate((UnityEngine.Object)map);\n            customMap.name = CustomName;\n\n            var nameKey = itemObjectType.GetField("nameKey", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);\n            if (nameKey != null && nameKey.FieldType == typeof(string))\n                nameKey.SetValue(customMap, "Testaldi Map");\n\n            var core = GetSingletonInstance(coreGameManagerType);\n            if (core == null)\n            {\n                Plugin.Log.LogError("Testaldi Map: Singleton<CoreGameManager>.Instance was not available.");\n                return;\n            }\n\n            var getPlayer = coreGameManagerType.GetMethod("GetPlayer", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);\n            object? player = getPlayer?.Invoke(core, new object[] { 0 });\n            if (player == null)\n            {\n                Plugin.Log.LogError("Testaldi Map: player 0 was not available.");\n                return;\n            }\n\n            var playerManagerType = FindType("PlayerManager");\n            var inventoryField = playerManagerType?.GetField("itm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);\n            var inventory = inventoryField?.GetValue(player);\n            if (inventory == null)\n            {\n                Plugin.Log.LogError("Testaldi Map: player inventory was not available.");\n                return;\n            }\n\n            var addItem = inventory.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).FirstOrDefault(m =>\n            {\n                if (m.Name != "AddItem") return false;\n                var parameters = m.GetParameters();\n                return parameters.Length == 1 && parameters[0].ParameterType.IsAssignableFrom(itemObjectType);\n            });\n\n            if (addItem == null)\n            {\n                Plugin.Log.LogError("Testaldi Map: no Inventory.AddItem(ItemObject) method was found.");\n                return;\n            }\n\n            addItem.Invoke(inventory, new[] { customMap });\n            Plugin.Log.LogInfo("F2 pressed — gave the player the custom Testaldi Map.");\n        }\n        catch (Exception ex)\n        {\n            Plugin.Log.LogError($"Testaldi Map failed: {ex.GetType().Name}: {ex.Message}");\n        }\n    }\n\n    private static object? GetSingletonInstance(Type targetType)\n    {\n        var singletonTypeName = "Singleton" + ((char)96) + "1";\n        var singletonType = FindType(singletonTypeName);\n\n        if (singletonType == null || !singletonType.IsGenericTypeDefinition)\n        {\n            Plugin.Log.LogError("Testaldi Map: could not find the game Singleton<T> type.");\n            return null;\n        }\n\n        var closedSingleton = singletonType.MakeGenericType(targetType);\n        var instanceProperty = closedSingleton.GetProperty("Instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);\n        return instanceProperty?.GetValue(null);\n    }\n\n    private static object? FindMap(Type itemObjectType)\n    {\n        var allItems = Resources.FindObjectsOfTypeAll(itemObjectType);\n        foreach (var obj in allItems)\n        {\n            if (obj == null) continue;\n            if (obj.name == SourceName || obj.name.IndexOf("Map", StringComparison.OrdinalIgnoreCase) >= 0)\n                return obj;\n        }\n        return null;\n    }\n\n    private static Type? FindType(string name)\n    {\n        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())\n        {\n            var type = assembly.GetType(name);\n            if (type != null) return type;\n        }\n        return null;\n    }\n}
+using BepInEx;
+using BepInEx.Bootstrap;
+using BepInEx.Logging;
+using System;
+using System.Linq;
+using System.Reflection;
+using UnityEngine;
+
+namespace Testaldi;
+
+[BepInPlugin(PluginGuid, PluginName, PluginVersion)]
+[BepInDependency("mtm101.rulerp.bbplus.baldidevapi", "11.1.0.2")]
+public sealed class Plugin : BaseUnityPlugin
+{
+    public const string PluginGuid = "carjam120443.testaldi";
+    public const string PluginName = "Testaldi";
+    public const string PluginVersion = "0.1.0";
+
+    internal static ManualLogSource Log { get; private set; } = null!;
+
+    private void Awake()
+    {
+        Log = Logger;
+        Log.LogInfo($"{PluginName} {PluginVersion} loaded.");
+
+        if (Chainloader.PluginInfos.TryGetValue("mtm101.rulerp.bbplus.baldidevapi", out var api))
+            Log.LogInfo($"Baldi's Basics Plus Dev API detected: {api.Metadata.Version}");
+        else
+            Log.LogError("Baldi's Basics Plus Dev API was not detected.");
+    }
+
+    private void Update()
+    {
+        if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.F2))
+            CustomMapItem.TryGive();
+    }
+}
+
+internal static class CustomMapItem
+{
+    private const string SourceName = "Itm_Map";
+    private const string CustomName = "Itm_TestaldiMap";
+
+    internal static void TryGive()
+    {
+        try
+        {
+            var itemObjectType = FindType("ItemObject");
+            var coreGameManagerType = FindType("CoreGameManager");
+
+            if (itemObjectType == null || coreGameManagerType == null)
+            {
+                Plugin.Log.LogError("Testaldi Map: required BB+ types were not found.");
+                return;
+            }
+
+            var map = FindMap(itemObjectType);
+            if (map == null)
+            {
+                Plugin.Log.LogError("Testaldi Map: could not find the built-in Map item.");
+                return;
+            }
+
+            var customMap = (UnityEngine.Object)UnityEngine.Object.Instantiate((UnityEngine.Object)map);
+            customMap.name = CustomName;
+
+            var nameKey = itemObjectType.GetField(
+                "nameKey",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+            if (nameKey != null && nameKey.FieldType == typeof(string))
+                nameKey.SetValue(customMap, "Testaldi Map");
+
+            var core = GetSingletonInstance(coreGameManagerType);
+            if (core == null)
+            {
+                Plugin.Log.LogError("Testaldi Map: Singleton<CoreGameManager>.Instance was not available.");
+                return;
+            }
+
+            var getPlayer = coreGameManagerType.GetMethod(
+                "GetPlayer",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+            object? player = getPlayer?.Invoke(core, new object[] { 0 });
+
+            if (player == null)
+            {
+                Plugin.Log.LogError("Testaldi Map: player 0 was not available.");
+                return;
+            }
+
+            var playerManagerType = FindType("PlayerManager");
+            var inventoryField = playerManagerType?.GetField(
+                "itm",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+            var inventory = inventoryField?.GetValue(player);
+
+            if (inventory == null)
+            {
+                Plugin.Log.LogError("Testaldi Map: player inventory was not available.");
+                return;
+            }
+
+            var addItem = inventory.GetType()
+                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .FirstOrDefault(m =>
+                {
+                    if (m.Name != "AddItem")
+                        return false;
+
+                    var parameters = m.GetParameters();
+                    return parameters.Length == 1 &&
+                           parameters[0].ParameterType.IsAssignableFrom(itemObjectType);
+                });
+
+            if (addItem == null)
+            {
+                Plugin.Log.LogError("Testaldi Map: no Inventory.AddItem(ItemObject) method was found.");
+                return;
+            }
+
+            addItem.Invoke(inventory, new[] { customMap });
+            Plugin.Log.LogInfo("F2 pressed — gave the player the custom Testaldi Map.");
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.LogError($"Testaldi Map failed: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private static object? GetSingletonInstance(Type targetType)
+    {
+        var singletonTypeName = "Singleton" + ((char)96) + "1";
+        var singletonType = FindType(singletonTypeName);
+
+        if (singletonType == null || !singletonType.IsGenericTypeDefinition)
+        {
+            Plugin.Log.LogError("Testaldi Map: could not find the game's Singleton<T> type.");
+            return null;
+        }
+
+        var closedSingleton = singletonType.MakeGenericType(targetType);
+
+        var instanceProperty = closedSingleton.GetProperty(
+            "Instance",
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+
+        return instanceProperty?.GetValue(null);
+    }
+
+    private static object? FindMap(Type itemObjectType)
+    {
+        var allItems = Resources.FindObjectsOfTypeAll(itemObjectType);
+
+        foreach (var obj in allItems)
+        {
+            if (obj == null)
+                continue;
+
+            if (obj.name == SourceName ||
+                obj.name.IndexOf("Map", StringComparison.OrdinalIgnoreCase) >= 0)
+                return obj;
+        }
+
+        return null;
+    }
+
+    private static Type? FindType(string name)
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            var type = assembly.GetType(name);
+
+            if (type != null)
+                return type;
+        }
+
+        return null;
+    }
+}
