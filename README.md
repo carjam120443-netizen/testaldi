@@ -16,6 +16,19 @@ A Baldi's Basics Plus mod project for experimenting with custom content and game
 - **Modding:** BepInEx + BB+ modding API/tooling
 - **Development/debugging:** PineDebug
 
+## Compatibility
+
+Testaldi and future mods in this project are developed for **Baldi's Basics Plus Dev API 11.1.0.2**.
+
+The compatibility target is the **latest Baldi's Basics Plus game version that is compatible with Dev API 11.1.0.2**. If the latest game version is not compatible with that API version, development will target the game version that is actually being used for the project instead.
+
+In short:
+
+- **Dev API target:** 11.1.0.2
+- **Game target:** Latest compatible BB+ version when possible
+- **Fallback:** The BB+ version currently being used for development/testing
+- Future mods in this project will follow the same compatibility policy unless explicitly stated otherwise.
+
 ## Project Goals
 
 Testaldi is a general-purpose BB+ mod project for experimenting with:
