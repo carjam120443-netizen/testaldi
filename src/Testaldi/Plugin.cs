@@ -28,7 +28,7 @@ public sealed class Plugin : BaseUnityPlugin
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.F2))
+        if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.F2))
         {
             Log.LogInfo("F2 pressed — Testaldi map-item test hotkey triggered.");
         }
