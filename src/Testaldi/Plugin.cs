@@ -26,7 +26,7 @@ public sealed class Plugin : BaseUnityPlugin
         if (Chainloader.PluginInfos.TryGetValue("mtm101.rulerp.bbplus.baldidevapi", out var api))
         {
             Log.LogInfo($"Baldi's Basics Plus Dev API detected: {api.Metadata.Version}");
-            CustomMapItem.Initialize(api.Metadata);
+            CustomMapItem.Initialize(api);
         }
         else
             Log.LogError("Baldi's Basics Plus Dev API was not detected.");
