@@ -52,6 +52,14 @@ jobs:
           New-Item -ItemType Directory -Force -Path "Dependencies" | Out-Null
           Copy-Item $dll.FullName "Dependencies\\UnityEngine.CoreModule.dll"
 
+      - name: Add required Unity InputLegacyModule library
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem "$env:RUNNER_TEMP\unity" -Recurse -Filter "UnityEngine.InputLegacyModule.dll" | Select-Object -First 1
+          if (-not $dll) { throw "UnityEngine.InputLegacyModule.dll was not found in the Unity managed libraries package." }
+          New-Item -ItemType Directory -Force -Path "Dependencies" | Out-Null
+          Copy-Item $dll.FullName "Dependencies\UnityEngine.InputLegacyModule.dll"
+
       - name: Restore
         run: dotnet restore src/Testaldi/Testaldi.csproj
 
