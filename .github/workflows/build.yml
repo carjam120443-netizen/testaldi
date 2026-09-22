@@ -29,9 +29,12 @@ jobs:
           Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\bepinex.zip"
           Expand-Archive "$env:RUNNER_TEMP\bepinex.zip" -DestinationPath "$env:RUNNER_TEMP\bepinex"
           $dll = Get-ChildItem "$env:RUNNER_TEMP\bepinex" -Recurse -Filter "BepInEx.dll" | Select-Object -First 1
+          $harmony = Get-ChildItem "$env:RUNNER_TEMP\bepinex" -Recurse -Filter "0Harmony.dll" | Select-Object -First 1
           if (-not $dll) { throw "BepInEx.dll was not found in the downloaded package." }
+          if (-not $harmony) { throw "0Harmony.dll was not found in the downloaded package." }
           New-Item -ItemType Directory -Force -Path "Dependencies" | Out-Null
           Copy-Item $dll.FullName "Dependencies\BepInEx.dll"
+          Copy-Item $harmony.FullName "Dependencies\0Harmony.dll"
 
       - name: Download Unity 2020.3.49 managed libraries
         shell: pwsh
