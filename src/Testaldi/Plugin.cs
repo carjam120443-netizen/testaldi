@@ -2,6 +2,7 @@ using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using System;
+using System.Linq;
 using System.Reflection;
 using UnityEngine;
 
@@ -31,79 +32,121 @@ public sealed class Plugin : BaseUnityPlugin
     private void Update()
     {
         if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.F2))
-        {
-            GiveMapForF2();
-        }
+            CustomMapItem.TryGive();
     }
+}
 
-    private static void GiveMapForF2()
+internal static class CustomMapItem
+{
+    private const string SourceName = "Itm_Map";
+    private const string CustomName = "Itm_TestaldiMap";
+
+    internal static void TryGive()
     {
         try
         {
+            var itemObjectType = FindType("ItemObject");
             var coreGameManagerType = FindType("CoreGameManager");
-            var playerManagerType = FindType("PlayerManager");
-            var itemsType = FindType("Items");
 
-            if (coreGameManagerType == null || playerManagerType == null || itemsType == null)
+            if (itemObjectType == null || coreGameManagerType == null)
             {
-                Log.LogError("F2 map test could not find the BB+ game types.");
+                Plugin.Log.LogError("Testaldi Map: required BB+ types were not found.");
                 return;
             }
 
-            var coreInstanceProperty = coreGameManagerType.GetProperty(
+            var map = FindMap(itemObjectType);
+            if (map == null)
+            {
+                Plugin.Log.LogError("Testaldi Map: could not find the built-in Map item.");
+                return;
+            }
+
+            var customMap = UnityEngine.Object.Instantiate(map);
+            customMap.name = CustomName;
+
+            var nameKey = itemObjectType.GetField(
+                "nameKey",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+            if (nameKey != null && nameKey.FieldType == typeof(string))
+                nameKey.SetValue(customMap, "Testaldi Map");
+
+            var core = coreGameManagerType.GetProperty(
                 "Instance",
-                BindingFlags.Public | BindingFlags.Static);
+                BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
 
-            object? coreInstance = coreInstanceProperty?.GetValue(null);
-            if (coreInstance == null)
+            if (core == null)
             {
-                Log.LogError("F2 map test could not find CoreGameManager.Instance.");
+                Plugin.Log.LogError("Testaldi Map: CoreGameManager.Instance was not available.");
                 return;
             }
 
-            var getPlayer = coreGameManagerType.GetMethod(
+            var player = coreGameManagerType.GetMethod(
                 "GetPlayer",
-                BindingFlags.Public | BindingFlags.Instance);
+                BindingFlags.Public | BindingFlags.Instance)?.Invoke(core, new object[] { 0 });
 
-            object? player = getPlayer?.Invoke(coreInstance, new object[] { 0 });
             if (player == null)
             {
-                Log.LogError("F2 map test could not find player 0.");
+                Plugin.Log.LogError("Testaldi Map: player 0 was not available.");
                 return;
             }
 
-            var inventoryField = playerManagerType.GetField(
+            var playerManagerType = FindType("PlayerManager");
+            var inventoryField = playerManagerType?.GetField(
                 "itm",
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
-            object? inventory = inventoryField?.GetValue(player);
+            var inventory = inventoryField?.GetValue(player);
+
             if (inventory == null)
             {
-                Log.LogError("F2 map test could not find the player's item inventory.");
+                Plugin.Log.LogError("Testaldi Map: player inventory was not available.");
                 return;
             }
 
-            var mapValue = Enum.Parse(itemsType, "Map");
-            var addItem = inventory.GetType().GetMethod(
-                "AddItem",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
-                null,
-                new[] { itemsType },
-                null);
+            var addItem = inventory.GetType()
+                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .FirstOrDefault(m =>
+                {
+                    if (m.Name != "AddItem")
+                        return false;
+
+                    var parameters = m.GetParameters();
+                    return parameters.Length == 1 &&
+                           parameters[0].ParameterType.IsAssignableFrom(itemObjectType);
+                });
 
             if (addItem == null)
             {
-                Log.LogError("F2 map test could not find Inventory.AddItem(Items).");
+                Plugin.Log.LogError("Testaldi Map: no Inventory.AddItem(ItemObject) method was found.");
                 return;
             }
 
-            addItem.Invoke(inventory, new[] { mapValue });
-            Log.LogInfo("F2 pressed — gave the player the built-in BB+ Map item.");
+            addItem.Invoke(inventory, new[] { customMap });
+            Plugin.Log.LogInfo("F2 pressed — gave the player the custom Testaldi Map.");
         }
         catch (Exception ex)
         {
-            Log.LogError($"F2 map test failed: {ex.GetType().Name}: {ex.Message}");
+            Plugin.Log.LogError($"Testaldi Map failed: {ex.GetType().Name}: {ex.Message}");
         }
+    }
+
+    private static object? FindMap(Type itemObjectType)
+    {
+        var allItems = Resources.FindObjectsOfTypeAll(
+            itemObjectType,
+            new Il2CppSystem.Collections.Generic.List<UnityEngine.Object>());
+
+        foreach (var obj in allItems)
+        {
+            if (obj == null)
+                continue;
+
+            if (obj.name == SourceName || obj.name.IndexOf("Map", StringComparison.OrdinalIgnoreCase) >= 0)
+                return obj;
+        }
+
+        return null;
     }
 
     private static Type? FindType(string name)
