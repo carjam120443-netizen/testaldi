@@ -117,5 +117,4 @@ public sealed class Plugin : BaseUnityPlugin
 
         return null;
     }
-    }
 }
