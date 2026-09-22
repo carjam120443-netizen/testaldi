@@ -33,6 +33,17 @@ jobs:
           New-Item -ItemType Directory -Force -Path "Dependencies" | Out-Null
           Copy-Item $dll.FullName "Dependencies\BepInEx.dll"
 
+      - name: Download Unity 2020.3.49 managed libraries
+        shell: pwsh
+        run: |
+          $url = "https://unity.bepinex.dev/libraries/2020.3.49.zip"
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\unity.zip"
+          Expand-Archive "$env:RUNNER_TEMP\unity.zip" -DestinationPath "$env:RUNNER_TEMP\unity"
+          $dll = Get-ChildItem "$env:RUNNER_TEMP\unity" -Recurse -Filter "UnityEngine.dll" | Select-Object -First 1
+          if (-not $dll) { throw "UnityEngine.dll was not found in the Unity managed libraries package." }
+          New-Item -ItemType Directory -Force -Path "Dependencies" | Out-Null
+          Copy-Item $dll.FullName "Dependencies\UnityEngine.dll"
+
       - name: Restore
         run: dotnet restore src/Testaldi/Testaldi.csproj
 
