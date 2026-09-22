@@ -9,7 +9,7 @@ using UnityEngine;
 namespace Testaldi;
 
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-[BepInDependency("mtm101.rulerp.bbplus.baldidevapi", "11.1.1.0")]
+[BepInDependency("mtm101.rulerp.bbplus.baldidevapi", "11.1.0.2")]
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string PluginGuid = "carjam120443.testaldi";
