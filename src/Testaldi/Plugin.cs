@@ -1,6 +1,7 @@
 using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
+using HarmonyLib;
 using System;
 using System.Linq;
 using System.Reflection;
@@ -27,6 +28,7 @@ public sealed class Plugin : BaseUnityPlugin
         {
             Log.LogInfo($"Baldi's Basics Plus Dev API detected: {api.Metadata.Version}");
             CustomMapItem.Initialize(api);
+            CustomMapItem.InstallUsePatch();
         }
         else
             Log.LogError("Baldi's Basics Plus Dev API was not detected.");
@@ -167,10 +169,7 @@ internal static class CustomMapItem
 
         var builder = constructor.Invoke(new[] { apiMetadata });
 
-        var itemsEnumType = FindType("Items");
-        var setEnum = itemsEnumType == null
-            ? null
-            : itemBuilderType.GetMethod("SetEnum", new[] { itemsEnumType });
+        var setEnum = itemBuilderType.GetMethod("SetEnum", new[] { typeof(string) });
         var setName = itemBuilderType.GetMethod(
             "SetNameAndDescription",
             new[] { typeof(string), typeof(string) });
@@ -190,14 +189,13 @@ internal static class CustomMapItem
 
         var build = itemBuilderType.GetMethod("Build", Type.EmptyTypes);
 
-        if (itemsEnumType == null || setEnum == null || setName == null || setComponent == null || build == null)
+        if (setEnum == null || setName == null || setComponent == null || build == null)
         {
             Plugin.Log.LogError("Testaldi Map: required Dev API ItemBuilder methods were not found.");
             return null;
         }
 
-        var mapEnum = Enum.Parse(itemsEnumType, "Map");
-        setEnum.Invoke(builder, new[] { mapEnum });
+        setEnum.Invoke(builder, new object[] { CustomName });
         setName.Invoke(builder, new object[] { "Testaldi Map", "A Testaldi map item." });
         setComponent.Invoke(builder, new[] { mapItem });
 
@@ -209,8 +207,108 @@ internal static class CustomMapItem
             return null;
         }
 
-        Plugin.Log.LogInfo("Testaldi Map: built a custom ItemObject using the built-in Items.Map enum and Dev API.");
+        Plugin.Log.LogInfo("Testaldi Map: built a custom ItemObject with its own enum and Dev API.");
         return built;
+    }
+
+    internal static void InstallUsePatch()
+    {
+        try
+        {
+            var itemManagerType = FindType("ItemManager");
+            var useItem = itemManagerType?.GetMethod(
+                "UseItem",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                null,
+                Type.EmptyTypes,
+                null);
+
+            if (useItem == null)
+            {
+                Plugin.Log.LogError("Testaldi Map: could not find ItemManager.UseItem.");
+                return;
+            }
+
+            var harmony = new Harmony(Plugin.PluginGuid);
+            var prefix = typeof(CustomMapItem).GetMethod(
+                nameof(UseItemPrefix),
+                BindingFlags.NonPublic | BindingFlags.Static);
+
+            harmony.Patch(useItem, prefix: new HarmonyMethod(prefix));
+            Plugin.Log.LogInfo("Testaldi Map: installed custom map use hook.");
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.LogError($"Testaldi Map: failed to install use hook: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private static bool UseItemPrefix(object __instance)
+    {
+        try
+        {
+            var managerType = __instance.GetType();
+            var itemsField = managerType.GetField(
+                "items",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var selectedField = managerType.GetField(
+                "selectedItem",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+            var items = itemsField?.GetValue(__instance) as Array;
+            var selected = selectedField?.GetValue(__instance);
+
+            if (items == null || selected is not int selectedIndex ||
+                selectedIndex < 0 || selectedIndex >= items.Length)
+                return true;
+
+            var selectedItem = items.GetValue(selectedIndex);
+            if (selectedItem == null)
+                return true;
+
+            var nameKeyField = selectedItem.GetType().GetField(
+                "nameKey",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var nameKey = nameKeyField?.GetValue(selectedItem) as string;
+
+            if (!string.Equals(nameKey, "Testaldi Map", StringComparison.Ordinal))
+                return true;
+
+            var coreType = FindType("CoreGameManager");
+            if (coreType == null)
+                return true;
+
+            var core = GetSingletonInstance(coreType);
+            if (core == null)
+                return true;
+
+            var pause = coreType.GetMethod(
+                "Pause",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                null,
+                new[] { typeof(bool) },
+                null);
+            var openMap = coreType.GetMethod(
+                "OpenMap",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                null,
+                Type.EmptyTypes,
+                null);
+
+            if (pause == null || openMap == null)
+                return true;
+
+            pause.Invoke(core, new object[] { false });
+            openMap.Invoke(core, null);
+
+            Plugin.Log.LogInfo("Testaldi Map: opened the game's advanced map.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.LogError($"Testaldi Map: use hook failed: {ex.GetType().Name}: {ex.Message}");
+            return true;
+        }
     }
 
     private static object? GetSingletonInstance(Type targetType)
