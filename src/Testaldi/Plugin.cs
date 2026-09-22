@@ -1,6 +1,7 @@
 using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
+using UnityEngine;
 
 namespace Testaldi;
 
@@ -23,5 +24,13 @@ public sealed class Plugin : BaseUnityPlugin
             Log.LogInfo($"Baldi's Basics Plus Dev API detected: {api.Metadata.Version}");
         else
             Log.LogError("Baldi's Basics Plus Dev API was not detected.");
+    }
+
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.F2))
+        {
+            Log.LogInfo("F2 pressed — Testaldi map-item test hotkey triggered.");
+        }
     }
 }
