@@ -61,7 +61,7 @@ internal static class CustomMapItem
                 return;
             }
 
-            var customMap = UnityEngine.Object.Instantiate(map);
+            var customMap = (UnityEngine.Object)UnityEngine.Object.Instantiate((UnityEngine.Object)map);
             customMap.name = CustomName;
 
             var nameKey = itemObjectType.GetField(
@@ -133,9 +133,7 @@ internal static class CustomMapItem
 
     private static object? FindMap(Type itemObjectType)
     {
-        var allItems = Resources.FindObjectsOfTypeAll(
-            itemObjectType,
-            new Il2CppSystem.Collections.Generic.List<UnityEngine.Object>());
+        var allItems = Resources.FindObjectsOfTypeAll(itemObjectType);
 
         foreach (var obj in allItems)
         {
