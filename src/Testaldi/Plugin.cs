@@ -64,12 +64,8 @@ internal static class CustomMapItem
             var customMap = (UnityEngine.Object)UnityEngine.Object.Instantiate((UnityEngine.Object)map);
             customMap.name = CustomName;
 
-            var nameKey = itemObjectType.GetField(
-                "nameKey",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-            if (nameKey != null && nameKey.FieldType == typeof(string))
-                nameKey.SetValue(customMap, "Testaldi Map");
+            // Keep the original Map nameKey. BB+ uses the built-in item metadata
+            // when handling the Map's special use behavior; changing it breaks that path.
 
             var core = GetSingletonInstance(coreGameManagerType);
             if (core == null)
