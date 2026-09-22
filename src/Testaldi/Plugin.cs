@@ -167,31 +167,37 @@ internal static class CustomMapItem
 
         var builder = constructor.Invoke(new[] { apiMetadata });
 
-        var setEnum = itemBuilderType.GetMethod("SetEnum", new[] { typeof(string) });
+        var itemsEnumType = FindType("Items");
+        var setEnum = itemsEnumType == null
+            ? null
+            : itemBuilderType.GetMethod("SetEnum", new[] { itemsEnumType });
         var setName = itemBuilderType.GetMethod(
             "SetNameAndDescription",
             new[] { typeof(string), typeof(string) });
 
-        var setComponent = itemBuilderType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+        var setComponentDefinition = itemBuilderType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
             .FirstOrDefault(m =>
             {
-                if (m.Name != "SetItemComponent")
+                if (m.Name != "SetItemComponent" || !m.IsGenericMethodDefinition)
                     return false;
 
                 var parameters = m.GetParameters();
                 return parameters.Length == 1 &&
-                       parameters[0].ParameterType.IsAssignableFrom(itemType);
+                       parameters[0].ParameterType.IsGenericParameter;
             });
+
+        var setComponent = setComponentDefinition?.MakeGenericMethod(itemType);
 
         var build = itemBuilderType.GetMethod("Build", Type.EmptyTypes);
 
-        if (setEnum == null || setName == null || setComponent == null || build == null)
+        if (itemsEnumType == null || setEnum == null || setName == null || setComponent == null || build == null)
         {
             Plugin.Log.LogError("Testaldi Map: required Dev API ItemBuilder methods were not found.");
             return null;
         }
 
-        setEnum.Invoke(builder, new object[] { CustomName });
+        var mapEnum = Enum.Parse(itemsEnumType, "Map");
+        setEnum.Invoke(builder, new[] { mapEnum });
         setName.Invoke(builder, new object[] { "Testaldi Map", "A Testaldi map item." });
         setComponent.Invoke(builder, new[] { mapItem });
 
@@ -203,7 +209,7 @@ internal static class CustomMapItem
             return null;
         }
 
-        Plugin.Log.LogInfo("Testaldi Map: registered custom Items enum and built ItemObject through Dev API.");
+        Plugin.Log.LogInfo("Testaldi Map: built a custom ItemObject using the built-in Items.Map enum and Dev API.");
         return built;
     }
 
